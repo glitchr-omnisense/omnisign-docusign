@@ -1,6 +1,6 @@
 # omnisign/docusign
 
-**DocuSign eSignature** for [glitchr/omnisign](https://github.com/glitchr-studio/omnisign):
+**DocuSign eSignature** for [omniscient/omnisign](https://github.com/glitchr-studio/omnisign):
 envelopes through the REST API v2.1, by e-mail or signed in the application's page, the JWT grant
 for an integration acting as one of the account's users, Connect webhooks with their HMAC checked.
 
