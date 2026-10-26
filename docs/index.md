@@ -11,7 +11,7 @@ order: 1
 composer require omnisign/docusign
 ```
 
-PHP 8.2 or later, `ext-openssl`, `omniscient/omnisign` and `symfony/http-client`. A DocuSign
+PHP 8.2 or later, `ext-openssl`, `omnisense/omnisign` and `symfony/http-client`. A DocuSign
 integration (its key, an RSA key pair whose public half is on the integration), the user it acts as
 - who granted it consent once -, and the account's id.
 
