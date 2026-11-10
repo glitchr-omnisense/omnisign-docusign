@@ -2,6 +2,7 @@
 
 namespace Omnisign\Docusign;
 
+use Omnisense\Contracts\Policy\UsagePolicy;
 use Omnisign\Config;
 use Omnisign\Docusign\Action\CancelAction;
 use Omnisign\Docusign\Action\CreateAction;
@@ -33,8 +34,22 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class DocusignGatewayFactory extends GatewayFactory
 {
+    private static ?UsagePolicy $policy = null;
+
     public function __construct(private readonly ?HttpClientInterface $http = null)
     {
+    }
+
+    /** Its usage policy, as policy.json declares it (read once). */
+    public static function usagePolicy(): UsagePolicy
+    {
+        return self::$policy ??= UsagePolicy::fromFile(__DIR__.'/policy.json');
+    }
+
+    /** In the sandbox, its usage policy with the sandbox's own limits. */
+    public static function sandboxPolicy(): UsagePolicy
+    {
+        return self::usagePolicy()->tighten(['rateLimits' => [['max' => 200, 'window' => 'second', 'every' => 30, 'scope' => 'key', 'note' => 'Developer environment: a burst of 200 calls in 30 seconds']]]);
     }
 
     protected function populateConfig(Config $config): void
@@ -46,7 +61,7 @@ final class DocusignGatewayFactory extends GatewayFactory
             'sandbox' => true,
             'base_uri' => null,
             'hmac_keys' => [],
-            'omnisign.capabilities' => new Capabilities([Level::SIMPLE], embedded: true, ordered: true, identityCheck: false, thirdParty: true),
+            'omnisign.capabilities' => static fn (Config $c) => new Capabilities([Level::SIMPLE], embedded: true, ordered: true, identityCheck: false, thirdParty: true, policy: $c->bool('sandbox') ? self::sandboxPolicy() : self::usagePolicy()),
             'omnisign.api' => function (Config $c): Api {
                 $sandbox = $c->bool('sandbox');
 
@@ -59,6 +74,7 @@ final class DocusignGatewayFactory extends GatewayFactory
                     $c->get('base_uri') ? rtrim((string) $c['base_uri'], '/') : ($sandbox ? 'https://demo.docusign.net/restapi' : null),
                     $sandbox ? Api::DEMO_OAUTH : Api::OAUTH,
                     $c->list('hmac_keys'),
+                    backoff: $c->backoff(),
                 );
             },
             'omnisign.action.create' => new CreateAction(),

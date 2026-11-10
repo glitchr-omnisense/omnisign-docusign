@@ -2,6 +2,7 @@
 
 namespace Omnisign\Docusign;
 
+use Omnisense\Contracts\Policy\Backoff;
 use Omnisign\Exception\InvalidConfigException;
 use Omnisign\Exception\InvalidKeyException;
 use Omnisign\Exception\InvalidNotificationException;
@@ -36,6 +37,7 @@ final class Api
         /** @var list<string> */
         #[\SensitiveParameter] private readonly array $hmacKeys = [],
         private readonly ?\Closure $clock = null,
+        private readonly ?Backoff $backoff = null,
     ) {
     }
 
@@ -110,7 +112,7 @@ final class Api
         if (null !== $this->token && $now < $this->expires) {
             return $this->token;
         }
-        $answer = Answer::send($this->http, self::PROVIDER, 'POST', 'https://'.$this->oauthHost.'/oauth/token', ['body' => ['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $this->assertion($now)]]);
+        $answer = Answer::send($this->http, self::PROVIDER, 'POST', 'https://'.$this->oauthHost.'/oauth/token', ['body' => ['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $this->assertion($now)]], $this->backoff);
         $data = json_decode($answer->body, true);
         if ($answer->status >= 400 || !\is_array($data) || !isset($data['access_token'])) {
             // consent_required: the user never allowed the integration to act for them.
@@ -128,7 +130,7 @@ final class Api
         if (null !== $this->baseUri) {
             return $this->baseUri;
         }
-        $answer = Answer::send($this->http, self::PROVIDER, 'GET', 'https://'.$this->oauthHost.'/oauth/userinfo', ['headers' => ['Authorization' => 'Bearer '.$this->token()]]);
+        $answer = Answer::send($this->http, self::PROVIDER, 'GET', 'https://'.$this->oauthHost.'/oauth/userinfo', ['headers' => ['Authorization' => 'Bearer '.$this->token()]], $this->backoff);
         foreach ((array) ($answer->json()['accounts'] ?? []) as $account) {
             if (($account['account_id'] ?? null) === $this->accountId) {
                 return $this->baseUri = rtrim((string) $account['base_uri'], '/').'/restapi';
@@ -142,7 +144,7 @@ final class Api
     private function call(string $method, string $path, array $options): Answer
     {
         $options['headers'] = ['Authorization' => 'Bearer '.$this->token()] + ($options['headers'] ?? []);
-        $answer = Answer::send($this->http, self::PROVIDER, $method, $this->base().$path, $options);
+        $answer = Answer::send($this->http, self::PROVIDER, $method, $this->base().$path, $options, $this->backoff);
         if ($answer->status >= 400) {
             $error = json_decode($answer->body, true);
             $message = \sprintf('%s %s: HTTP %d, %s', $method, $path, $answer->status, \is_array($error) ? trim(($error['errorCode'] ?? '').' '.($error['message'] ?? '')) : mb_substr(trim($answer->body), 0, 200));

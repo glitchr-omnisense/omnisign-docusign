@@ -23,6 +23,14 @@ no developer account.**
 [Documentation](docs/index.md): the options and the JWT grant, from an envelope to DocuSign's,
 Connect, what was verified.
 
+## Usage policy
+
+`policy.json`, read on 2026-11-10 in DocuSign's [rules and limits](https://developers.docusign.com/docs/esign-rest-api/esign101/rules-and-limits/)
+and [developer terms](https://www.docusign.com/legal/terms-and-conditions/developers): 3,000 calls an hour per account,
+a burst of 500 in 30 seconds (200 in the developer environment, declared when `sandbox` is true).
+One status poll per envelope every 15 minutes is in the notes (a limit per envelope the schema
+cannot count): prefer Connect webhooks. A 429 holds the gateway's next calls.
+
 ## Responsibility
 
 This package is an independent, unofficial client: it is not affiliated with, endorsed by or
