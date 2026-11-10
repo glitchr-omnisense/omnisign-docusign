@@ -169,3 +169,15 @@ This package is an independent, unofficial client: it is not affiliated with, en
 sponsored by DocuSign, Inc. Whoever runs it complies with DocuSign's
 [Developer Terms and Conditions](https://www.docusign.com/legal/terms-and-conditions/developers);
 see the README's Responsibility section.
+
+## Next steps: identity verification
+
+DocuSign verifies a signer's identity inside the signature flow (ID Verification), not as a
+session of its own - the family's `identity-check` contract (omnisense/omnisign 1.1) would fit it
+only partly. Seen on 2026-11-10, not implemented:
+
+- `GET /restapi/v2.1/accounts/{accountId}/identity_verification` lists the account's ID Verification
+  workflows; a signer's `identityVerification: {workflowId, inputOptions}` in the envelope makes them
+  verify their document before signing (a phone number in `inputOptions` for phone workflows);
+- the outcome is read through the ID Evidence API's events, not the envelope; DocuSign's own forum
+  reports the IDV webhooks unreliable. Check DocuSign's current reference before writing it.
