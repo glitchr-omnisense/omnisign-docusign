@@ -16,6 +16,8 @@ use Omnisign\Docusign\Action\SigningUrlAction;
 use Omnisign\GatewayFactory;
 use Omnisign\Model\Capabilities;
 use Omnisign\Model\Level;
+use Omnisign\Model\StatementLimit;
+use Omnisign\Model\StatementMode;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -86,7 +88,7 @@ final class DocusignGatewayFactory extends GatewayFactory
             'sandbox' => true,
             'base_uri' => null,
             'hmac_keys' => [],
-            'omnisign.capabilities' => static fn (Config $c) => new Capabilities([Level::SIMPLE], embedded: true, ordered: true, identityCheck: false, thirdParty: true, policy: $c->bool('sandbox') ? self::sandboxPolicy() : self::usagePolicy()),
+            'omnisign.capabilities' => static fn (Config $c) => new Capabilities([Level::SIMPLE], embedded: true, ordered: true, identityCheck: false, thirdParty: true, policy: $c->bool('sandbox') ? self::sandboxPolicy() : self::usagePolicy(), statements: self::statements()),
             'omnisign.api' => function (Config $c): Api {
                 $sandbox = $c->bool('sandbox');
 
@@ -112,5 +114,20 @@ final class DocusignGatewayFactory extends GatewayFactory
             'omnisign.action.signing_url' => new SigningUrlAction(),
             'omnisign.action.notify' => static fn (Config $c) => $c->list('hmac_keys') ? new NotifyAction() : null,
         ]);
+    }
+
+    /**
+     * The statements DocuSign carries, as its eSignature REST API v2.1
+     * OpenAPI says (github.com/docusign/OpenAPI-Specifications,
+     * esignature.rest.swagger-v2.1.json, read 2026-11-11): typed in a text
+     * tab, whose value is 4000 bytes at most (the statement shown as its
+     * tooltip, its tabLabel 500 characters at most). No acknowledged one:
+     * the application prints it in the document.
+     *
+     * @return list<StatementLimit>
+     */
+    public static function statements(): array
+    {
+        return [new StatementLimit(StatementMode::TYPED, 4000, StatementLimit::BYTES, 'DocuSign eSignature REST API v2.1 OpenAPI, github.com/docusign/OpenAPI-Specifications, read 2026-11-11: text tab value "Maximum length: 4000 bytes"')];
     }
 }

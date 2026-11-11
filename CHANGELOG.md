@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Statements (omnisign 1.2): typed in a `textTabs` tab (the statement as its tooltip), 4000 bytes
+  at most, as DocuSign's OpenAPI says; a `TEXT` field's `maxLength` as the tab's.
+
 - DocuSign's status polling rule declared as a limit: one request per envelope every 15 minutes
   (`policy.json`: `"scope": "resource"`, `"per": "envelope"`, operation `pollEnvelope`), where the
   notes said no scope could count it. `FetchAction` counts its GET of the envelope under

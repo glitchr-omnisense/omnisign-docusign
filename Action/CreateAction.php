@@ -92,8 +92,11 @@ final class CreateAction extends AbstractAction
         $tab += null !== $field->anchor
             ? ['anchorString' => $field->anchor, 'anchorUnits' => 'pixels', 'anchorXOffset' => (string) $field->x, 'anchorYOffset' => (string) $field->y]
             : ['pageNumber' => (string) $field->page, 'xPosition' => (string) $field->x, 'yPosition' => (string) $field->y];
-        if (FieldType::MENTION === $field->type || FieldType::TEXT === $field->type) {
-            $tab += ['tabLabel' => $field->label ?? $field->type->value, 'required' => 'true'] + (FieldType::MENTION === $field->type ? ['value' => '', 'tooltip' => $field->label ?? 'Lu et approuvé'] : []);
+        if (FieldType::TEXT === $field->type && null !== $field->statement) {
+            // A statement the signer types: shown as the tooltip, the tab long enough for it (its value: 4000 bytes at most).
+            $tab += ['tabLabel' => mb_substr($field->label ?? 'statement', 0, 500), 'required' => 'true', 'value' => '', 'tooltip' => $field->statement, 'maxLength' => (string) min(4000, (int) ceil(\strlen($field->statement) * 1.2))];
+        } elseif (FieldType::MENTION === $field->type || FieldType::TEXT === $field->type) {
+            $tab += ['tabLabel' => $field->label ?? $field->type->value, 'required' => 'true'] + (FieldType::MENTION === $field->type ? ['value' => '', 'tooltip' => $field->label ?? 'Lu et approuvé'] : []) + (null !== $field->maxLength ? ['maxLength' => (string) $field->maxLength] : []);
         }
 
         return $tab;

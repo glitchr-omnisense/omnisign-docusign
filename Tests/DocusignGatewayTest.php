@@ -18,6 +18,8 @@ use Omnisign\Model\File;
 use Omnisign\Model\Level;
 use Omnisign\Model\Signer;
 use Omnisign\Model\SignerStatus;
+use Omnisign\Model\StatementLimit;
+use Omnisign\Model\StatementMode;
 use Omnisign\Model\Status;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -126,6 +128,31 @@ final class DocusignGatewayTest extends TestCase
         self::assertSame(['PUT', ['status' => 'sent']], [$this->calls[2][0], json_decode(Data::cast($this->calls[2][2]['body'] ?? null), true)]);
         self::assertSame(['include' => 'recipients'], $this->calls[3][2]['query']);
         self::assertSame([Status::SENT, SignerStatus::NOTIFIED, SignerStatus::WAITING], [$sent->status, $sent->state('landlord')?->status, $sent->state('tenant')?->status]);
+    }
+
+    public function testAStatementTheSignerTypesFitsInATextTabsFourThousandBytes(): void
+    {
+        $mention = 'Bon pour caution solidaire de Camille Érable à hauteur de 25 000 euros, principal, intérêts et pénalités compris, pour la durée du bail.';
+        $capabilities = $this->gateway([])->capabilities();
+        self::assertSame([4000, StatementLimit::BYTES], [$capabilities->statement()?->maxLength, $capabilities->statement()?->unit]);
+        self::assertTrue($capabilities->fits($mention));
+        self::assertFalse($capabilities->fits(str_repeat('é', 2001)), '4002 bytes in 2001 characters');
+        self::assertNull($capabilities->statement(StatementMode::ACKNOWLEDGED));
+
+        $this->gateway(['envelope-created:201'])->create(new Envelope('Caution', [new Document('deed', new File('%PDF-1.7 deed', 'caution.pdf'))], [new Signer('surety', 'Camille Érable', 'camille@erable.example')], [
+            Field::forStatement('surety', 'deed', $mention, page: 2, x: 60, y: 300, label: 'Mention de la caution'),
+            new Field('surety', 'deed', FieldType::TEXT, 2, 60, 500, label: 'Ville', maxLength: 80),
+        ]));
+        $body = Data::of(json_decode(Data::cast($this->calls[1][2]['body'] ?? null), true));
+        [$surety] = $body->data('recipients')->list('signers');
+        self::assertSame([
+            ['documentId' => '1', 'pageNumber' => '2', 'xPosition' => '60', 'yPosition' => '300', 'tabLabel' => 'Mention de la caution', 'required' => 'true', 'value' => '', 'tooltip' => $mention, 'maxLength' => (string) (int) ceil(\strlen($mention) * 1.2)],
+            ['documentId' => '1', 'pageNumber' => '2', 'xPosition' => '60', 'yPosition' => '500', 'tabLabel' => 'Ville', 'required' => 'true', 'maxLength' => '80'],
+        ], $surety->data('tabs')->get('textTabs'));
+
+        $this->calls = [];
+        $this->expectException(InvalidConfigException::class);
+        $this->gateway([])->create(new Envelope('x', [new Document('d', new File('%PDF', 'd.pdf'))], [new Signer('s', 'Solo', 's@example.org')], [Field::forStatement('s', 'd', 'Lu.', StatementMode::ACKNOWLEDGED)]));
     }
 
     public function testSigningInThePageRemindingCompletingDownloading(): void

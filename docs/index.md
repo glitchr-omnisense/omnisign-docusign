@@ -50,7 +50,7 @@ Read on 2026-10-08: the eSignature REST API v2.1 OpenAPI
 
 | | |
 |---|---|
-| `create()` | `POST /v2.1/accounts/{id}/envelopes`, `status: created`: the documents in base64 (`documentId` 1, 2...), the signers (`recipientId` 1, 2..., `routingOrder` their turn when ordered, `clientUserId` their key when embedded) and their tabs - `SIGNATURE` `signHereTabs`, `INITIALS` `initialHereTabs`, `DATE` `dateSignedTabs`, `TEXT` and `MENTION` `textTabs`; a position (`pageNumber`, `xPosition`, `yPosition`) or an `anchorString`; an expiry in days |
+| `create()` | `POST /v2.1/accounts/{id}/envelopes`, `status: created`: the documents in base64 (`documentId` 1, 2...), the signers (`recipientId` 1, 2..., `routingOrder` their turn when ordered, `clientUserId` their key when embedded) and their tabs - `SIGNATURE` `signHereTabs`, `INITIALS` `initialHereTabs`, `DATE` `dateSignedTabs`, `TEXT` and `MENTION` `textTabs` (`maxLength` the field's when given); a statement typed (since omnisign 1.2) a `textTabs` tab with the statement as its `tooltip`, `tabLabel` the label (500 characters at most), `maxLength` its length in bytes and a fifth more - the tab's value is **4000 bytes** at most (eSignature REST API v2.1 OpenAPI, `docusign/OpenAPI-Specifications`, read 2026-11-11), so a longer statement is refused before any call; an acknowledged statement is not carried (print it in the document); a position (`pageNumber`, `xPosition`, `yPosition`) or an `anchorString`; an expiry in days |
 | `send()` | `PUT .../envelopes/{id}`, `status: sent` |
 | `fetch()` | `GET .../envelopes/{id}?include=recipients` |
 | `remind()` | `PUT .../envelopes/{id}/recipients?resend_envelope=true` with the signers who have not signed |
