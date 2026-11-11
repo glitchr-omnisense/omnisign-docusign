@@ -2,6 +2,7 @@
 
 namespace Omnisign\Docusign;
 
+use Omnisense\Contracts\Policy\Scope;
 use Omnisense\Contracts\Policy\UsagePolicy;
 use Omnisign\Config;
 use Omnisign\Docusign\Action\CancelAction;
@@ -40,10 +41,34 @@ final class DocusignGatewayFactory extends GatewayFactory
     {
     }
 
-    /** Its usage policy, as policy.json declares it (read once). */
+    /**
+     * Its usage policy, as policy.json declares it (read once). Under an
+     * omnisense/contracts older than its resource scope (before 2f78f0e),
+     * which refuses the file's limit per envelope, the policy without it:
+     * what it declared before.
+     */
     public static function usagePolicy(): UsagePolicy
     {
-        return self::$policy ??= UsagePolicy::fromFile(__DIR__.'/policy.json');
+        return self::$policy ??= self::readPolicy(__DIR__.'/policy.json');
+    }
+
+    /** Whether the kernel counts limits per resource (omnisense/contracts 2f78f0e and later). */
+    public static function countsPerResource(): bool
+    {
+        return \defined(Scope::class.'::Resource');
+    }
+
+    private static function readPolicy(string $file): UsagePolicy
+    {
+        if (self::countsPerResource()) {
+            return UsagePolicy::fromFile($file);
+        }
+        $data = json_decode((string) file_get_contents($file), true, 64, \JSON_THROW_ON_ERROR);
+        \assert(\is_array($data) && \is_array($data['rateLimits'] ?? null));
+        $data['rateLimits'] = array_values(array_filter($data['rateLimits'], static fn (mixed $limit): bool => !\is_array($limit) || 'resource' !== ($limit['scope'] ?? null)));
+
+        /** @var array<string, mixed> $data */
+        return UsagePolicy::fromArray($data);
     }
 
     /** In the sandbox, its usage policy with the sandbox's own limits. */
@@ -79,7 +104,8 @@ final class DocusignGatewayFactory extends GatewayFactory
             },
             'omnisign.action.create' => new CreateAction(),
             'omnisign.action.send' => new SendAction(),
-            'omnisign.action.fetch' => new FetchAction(),
+            // One status request per envelope every 15 minutes: counted here, the envelope named (pollEnvelope).
+            'omnisign.action.fetch' => static fn (Config $c) => new FetchAction(self::countsPerResource() ? $c->guard($c->bool('sandbox') ? self::sandboxPolicy() : self::usagePolicy())->perResource() : null),
             'omnisign.action.remind' => new RemindAction(),
             'omnisign.action.cancel' => new CancelAction(),
             'omnisign.action.download' => new DownloadAction(),

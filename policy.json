@@ -14,6 +14,17 @@
             "every": 30,
             "scope": "key",
             "note": "Burst: 500 calls in 30 seconds in production; 200 in the developer environment (the factory declares that one when sandbox is true)"
+        },
+        {
+            "max": 1,
+            "window": "minute",
+            "every": 15,
+            "scope": "resource",
+            "per": "envelope",
+            "operations": [
+                "pollEnvelope"
+            ],
+            "note": "One status request per envelope every 15 minutes at most (the rules and limits page; DocuSign recommends 20, and Connect webhooks rather than polling; exceeding it can fail the Go-Live review). pollEnvelope is fetch()'s GET of the envelope, counted per envelope by the provider; the gateway counts \"fetch\" under the account's limits as before."
         }
     ],
     "rights": {
@@ -34,7 +45,7 @@
     "provenance": {
         "terms": "https://www.docusign.com/legal/terms-and-conditions/developers",
         "policy": "https://developers.docusign.com/docs/esign-rest-api/esign101/rules-and-limits/",
-        "notes": "Not expressible per envelope, so not declared as limits: one GET status request per envelope every 15 minutes (DocuSign recommends 20 minutes, Connect webhooks rather than polling; exceeding it can fail the Go-Live review), hourly and 30-second burst limits on each envelope's GETs and PUTs (Hourly_Envelope_Polling_Limit_Exceeded), five calls or fewer to create or update an envelope. Uploads: 32 MB a document through the API, 200 MB an envelope, 100 recipients an envelope; 70 in-progress uploads of the same document an hour, 10 downloads (combined: 3 an hour). Production needs a Go-Live review of the integration key and a paid eSignature plan (commercial: contract); the developer terms (last updated 2024-06-05) give a limited, revocable licence under the API restrictions and developer guidelines, which DocuSign may change; they say nothing this package could read as a storage, caching or redistribution rule: unknown. Price: per plan.",
+        "notes": "Declared per envelope (omnisense/contracts' resource scope): one GET status request per envelope every 15 minutes (DocuSign recommends 20 minutes, Connect webhooks rather than polling; exceeding it can fail the Go-Live review). Not declared, their figures not published: hourly and 30-second burst limits on each envelope's GETs and PUTs (Hourly_Envelope_Polling_Limit_Exceeded), five calls or fewer to create or update an envelope. Uploads: 32 MB a document through the API, 200 MB an envelope, 100 recipients an envelope; 70 in-progress uploads of the same document an hour, 10 downloads (combined: 3 an hour). Production needs a Go-Live review of the integration key and a paid eSignature plan (commercial: contract); the developer terms (last updated 2024-06-05) give a limited, revocable licence under the API restrictions and developer guidelines, which DocuSign may change; they say nothing this package could read as a storage, caching or redistribution rule: unknown. Price: per plan.",
         "verifiedAt": "2026-11-10",
         "declaredBy": "maintainer"
     }

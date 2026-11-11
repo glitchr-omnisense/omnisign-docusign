@@ -26,7 +26,7 @@ final class PolicyTest extends TestCase
 
     public function testThePolicyIsDeclaredAndRead(): void
     {
-        $declared = UsagePolicy::fromFile(__DIR__.'/../policy.json');
+        $declared = DocusignGatewayFactory::countsPerResource() ? UsagePolicy::fromFile(__DIR__.'/../policy.json') : DocusignGatewayFactory::usagePolicy();
         $composer = json_decode((string) file_get_contents(__DIR__.'/../composer.json'), true);
 
         self::assertIsArray($composer);
@@ -37,7 +37,7 @@ final class PolicyTest extends TestCase
         self::assertSame('2026-11-10', $declared->provenance->verifiedAt);
         self::assertSame($declared->toArray(), DocusignGatewayFactory::usagePolicy()->toArray());
         self::assertNotNull($declared->rateLimits);
-        self::assertSame([[3000, 'hour', 1], [500, 'second', 30]], array_map(static fn ($limit) => [$limit->max, $limit->window->value, $limit->every], $declared->rateLimits));
+        self::assertSame([[3000, 'hour', 1], [500, 'second', 30], ...(DocusignGatewayFactory::countsPerResource() ? [[1, 'minute', 15]] : [])], array_map(static fn ($limit) => [$limit->max, $limit->window->value, $limit->every], $declared->rateLimits));
 
         $registry = new Registry([new DocusignGatewayFactory(new MockHttpClient())], ['docusign' => ['factory' => 'docusign', 'options' => self::options()]]);
         self::assertSame(DocusignGatewayFactory::sandboxPolicy()->toArray(), $registry->policy('docusign')->toArray());
@@ -66,6 +66,36 @@ final class PolicyTest extends TestCase
             self::assertGreaterThanOrEqual(29, $e->retryAfter);
         }
         self::assertSame(1, $requests, 'the wait held the next request back');
+    }
+
+    public function testAnEnvelopeIsPolledOncePer15MinutesTheNextPollNeverSent(): void
+    {
+        if (!DocusignGatewayFactory::countsPerResource()) {
+            self::markTestSkipped('omnisense/contracts before 2f78f0e counts no limit per resource.');
+        }
+        $requests = 0;
+        $http = new MockHttpClient(function (string $method, string $url) use (&$requests): MockResponse {
+            if (str_contains($url, '/oauth/token')) {
+                return new MockResponse('{"access_token":"t","expires_in":3600}', ['response_headers' => ['content-type' => 'application/json']]);
+            }
+            ++$requests;
+
+            return new MockResponse('{"envelopeId":"x","status":"sent","recipients":{"signers":[]}}', ['response_headers' => ['content-type' => 'application/json']]);
+        });
+        $registry = new Registry([new DocusignGatewayFactory($http)], ['docusign' => ['factory' => 'docusign', 'options' => self::options() + ['base_uri' => 'https://demo.docusign.net/restapi']]]);
+        $gateway = $registry->get('docusign');
+
+        $gateway->fetch(new Envelope('Bail', reference: 'env-1'));
+        $gateway->fetch(new Envelope('Bail', reference: 'env-2'));
+        try {
+            $gateway->fetch(new Envelope('Bail', reference: 'env-1'));
+            self::fail('env-1 was polled twice within 15 minutes.');
+        } catch (UsageLimitReachedException $e) {
+            self::assertSame('1/15minute/resource:envelope/pollEnvelope', $e->limit?->id());
+            self::assertGreaterThan(890, $e->retryAfter);
+        }
+        self::assertSame(2, $requests, 'the second poll of env-1 was never sent');
+        self::assertSame(197, $registry->guard('docusign')->remaining('fetch'), 'three fetches counted once each under the sandbox\'s 200 in 30 seconds (the refused one too: it ran inside the gateway\'s fetch)');
     }
 
     /** @return array<string, mixed> */
