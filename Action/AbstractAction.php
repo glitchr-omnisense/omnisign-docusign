@@ -6,6 +6,7 @@ use Omnisign\Action\ActionInterface;
 use Omnisign\Action\ApiAwareInterface;
 use Omnisign\Action\ApiAwareTrait;
 use Omnisign\Docusign\Api;
+use Omnisign\Docusign\Data;
 use Omnisign\Model\Envelope;
 use Omnisign\Model\SignerState;
 use Omnisign\Model\SignerStatus;
@@ -38,22 +39,24 @@ abstract class AbstractAction implements ActionInterface, ApiAwareInterface
         foreach ($states as $key => $state) {
             $keys[(string) $state->reference] = $key;
         }
-        foreach ((array) ($answer['recipients']['signers'] ?? []) as $signer) {
-            $key = $keys[(string) ($signer['recipientId'] ?? '')] ?? null;
+        $read = Data::of($answer);
+        foreach ((array) ($read->data('recipients')->get('signers') ?? []) as $signer) {
+            $signer = Data::of($signer);
+            $key = $keys[$signer->text('recipientId')] ?? null;
             if (null === $key) {
                 continue;
             }
             $old = $states[$key];
-            $states[$key] = new SignerState($key, $old->reference, self::SIGNER_STATUSES[$signer['status'] ?? ''] ?? $old->status, isset($signer['signedDateTime']) ? new \DateTimeImmutable($signer['signedDateTime']) : $old->signedAt, $old->link, $old->linkExpiresAt, $signer['declinedReason'] ?? $old->reason);
+            $states[$key] = new SignerState($key, $old->reference, self::SIGNER_STATUSES[$signer->text('status')] ?? $old->status, $signer->moment('signedDateTime') ?? $old->signedAt, $old->link, $old->linkExpiresAt, $signer->textOrNull('declinedReason') ?? $old->reason);
         }
-        $status = (string) ($answer['status'] ?? '');
+        $status = $read->text('status');
 
         return $envelope->with(
-            reference: (string) ($answer['envelopeId'] ?? $envelope->reference),
+            reference: $read->textOrNull('envelopeId') ?? (string) $envelope->reference,
             // A voided envelope past its expiry: DocuSign voids what expires.
-            status: 'voided' === $status && str_contains(strtolower((string) ($answer['voidedReason'] ?? '')), 'expired') ? Status::EXPIRED : (self::STATUSES[$status] ?? Status::UNKNOWN),
+            status: 'voided' === $status && str_contains(strtolower($read->text('voidedReason')), 'expired') ? Status::EXPIRED : (self::STATUSES[$status] ?? Status::UNKNOWN),
             states: $states,
-            completedAt: isset($answer['completedDateTime']) ? new \DateTimeImmutable($answer['completedDateTime']) : null,
+            completedAt: $read->moment('completedDateTime'),
             data: $answer,
         );
     }

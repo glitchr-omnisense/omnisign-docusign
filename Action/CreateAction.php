@@ -42,12 +42,14 @@ final class CreateAction extends AbstractAction
         }
 
         $documents = $ids = [];
-        foreach (array_values($envelope->documents) as $i => $document) {
-            $ids[$document->key] = (string) ($i + 1);
-            $documents[] = ['documentBase64' => base64_encode($document->file->content), 'name' => $document->file->filename, 'fileExtension' => strtolower(pathinfo($document->file->filename, \PATHINFO_EXTENSION) ?: 'pdf'), 'documentId' => (string) ($i + 1)];
+        foreach ($envelope->documents as $document) {
+            $id = (string) (\count($documents) + 1);
+            $ids[$document->key] = $id;
+            $documents[] = ['documentBase64' => base64_encode($document->file->content), 'name' => $document->file->filename, 'fileExtension' => strtolower(pathinfo($document->file->filename, \PATHINFO_EXTENSION) ?: 'pdf'), 'documentId' => $id];
         }
         $signers = $states = [];
-        foreach (array_values($envelope->signers) as $i => $signer) {
+        foreach ($envelope->signers as $signer) {
+            $id = (string) (\count($signers) + 1);
             if (null !== $signer->authentication && 'none' !== $signer->authentication) {
                 throw new InvalidConfigException(\sprintf('The "docusign" gateway authenticates no signer by %s: an access code or a phone check is the account\'s setting.', $signer->authentication));
             }
@@ -55,11 +57,11 @@ final class CreateAction extends AbstractAction
             foreach ($envelope->fieldsOf($signer->key) as $field) {
                 $tabs[self::TABS[$field->type->value]][] = $this->tab($field, $ids);
             }
-            $states[$signer->key] = new SignerState($signer->key, (string) ($i + 1));
+            $states[$signer->key] = new SignerState($signer->key, $id);
             $signers[] = array_filter([
                 'email' => $signer->email,
                 'name' => $signer->name,
-                'recipientId' => (string) ($i + 1),
+                'recipientId' => $id,
                 'routingOrder' => (string) ($envelope->ordered ? $signer->order : 1),
                 'clientUserId' => $envelope->embedded ? $signer->key : null,
                 'tabs' => $tabs ?: null,

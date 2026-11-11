@@ -2,6 +2,7 @@
 
 namespace Omnisign\Docusign\Action;
 
+use Omnisign\Docusign\Data;
 use Omnisign\Model\Event;
 use Omnisign\Model\Notification;
 use Omnisign\Request\Notify;
@@ -29,15 +30,16 @@ final class NotifyAction extends AbstractAction
             $signatures[] = $signature;
         }
         $message = $this->api->verify($request->body, $signatures);
-        $type = (string) ($message['event'] ?? '');
-        $data = (array) ($message['data'] ?? []);
+        $read = Data::of($message);
+        $type = $read->text('event');
+        $data = Data::of((array) ($message['data'] ?? []));
         $request->setResult(new Notification(
             self::EVENTS[$type] ?? Event::OTHER,
             $type,
-            $data['envelopeId'] ?? null,
-            isset($data['recipientId']) ? (string) $data['recipientId'] : null,
-            isset($message['generatedDateTime']) ? new \DateTimeImmutable($message['generatedDateTime']) : null,
-            ($data['envelopeId'] ?? '').'@'.$type.'@'.($data['recipientId'] ?? '').'@'.($message['generatedDateTime'] ?? ''),
+            $data->textOrNull('envelopeId'),
+            $data->textOrNull('recipientId'),
+            $read->moment('generatedDateTime'),
+            $data->text('envelopeId').'@'.$type.'@'.$data->text('recipientId').'@'.$read->text('generatedDateTime'),
             $message,
         ));
     }

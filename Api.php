@@ -36,13 +36,15 @@ final class Api
         private readonly string $oauthHost = self::DEMO_OAUTH,
         /** @var list<string> */
         #[\SensitiveParameter] private readonly array $hmacKeys = [],
+        /** @var (\Closure(): int)|null */
         private readonly ?\Closure $clock = null,
         private readonly ?Backoff $backoff = null,
     ) {
     }
 
     /**
-     * @param array<string, mixed> $options
+     * @param array<string, mixed> $json
+     * @param array<string, mixed> $query
      *
      * @return array<string, mixed>
      */
@@ -53,6 +55,7 @@ final class Api
         return '' === trim($answer->body) ? [] : $answer->json();
     }
 
+    /** @param array<string, string> $query */
     public function file(string $path, array $query = []): Answer
     {
         return $this->call('GET', $path, ['query' => $query, 'headers' => ['Accept' => 'application/pdf']]);
@@ -68,7 +71,7 @@ final class Api
      * each the base64 HMAC-SHA-256 of the raw body under one of the
      * account's Connect keys.
      *
-     * @param array<string, string|null> $signatures
+     * @param array<string|null> $signatures
      *
      * @return array<string, mixed>
      */
@@ -89,7 +92,7 @@ final class Api
         }
         $data = json_decode($body, true);
 
-        return \is_array($data) ? $data : throw new InvalidNotificationException(self::PROVIDER, 'The message is not JSON: configure Connect to send JSON.');
+        return \is_array($data) ? Data::map($data) : throw new InvalidNotificationException(self::PROVIDER, 'The message is not JSON: configure Connect to send JSON.');
     }
 
     /** The JWT grant's assertion: RS256, for the user the integration acts as. */
@@ -103,7 +106,7 @@ final class Api
             throw new InvalidConfigException('The "docusign" gateway cannot sign with its private_key: a PEM RSA key, or the path of one.');
         }
 
-        return $header.'.'.$claims.'.'.$encode($signature);
+        return $header.'.'.$claims.'.'.$encode(Data::cast($signature));
     }
 
     private function token(): string
@@ -116,10 +119,10 @@ final class Api
         $data = json_decode($answer->body, true);
         if ($answer->status >= 400 || !\is_array($data) || !isset($data['access_token'])) {
             // consent_required: the user never allowed the integration to act for them.
-            throw new InvalidKeyException(self::PROVIDER, \sprintf('The JWT grant was refused (HTTP %d): %s', $answer->status, \is_array($data) ? ($data['error_description'] ?? $data['error'] ?? 'no reason') : 'no reason'), \is_array($data) ? ($data['error'] ?? null) : null);
+            throw new InvalidKeyException(self::PROVIDER, \sprintf('The JWT grant was refused (HTTP %d): %s', $answer->status, Data::of($data)->textOrNull('error_description') ?? Data::of($data)->textOrNull('error') ?? 'no reason'), Data::of($data)->textOrNull('error'));
         }
-        $this->token = (string) $data['access_token'];
-        $this->expires = $now + max(0, (int) ($data['expires_in'] ?? 3600) - 60);
+        $this->token = Data::of($data)->text('access_token');
+        $this->expires = $now + max(0, Data::integer($data['expires_in'] ?? 3600) - 60);
 
         return $this->token;
     }
@@ -132,8 +135,9 @@ final class Api
         }
         $answer = Answer::send($this->http, self::PROVIDER, 'GET', 'https://'.$this->oauthHost.'/oauth/userinfo', ['headers' => ['Authorization' => 'Bearer '.$this->token()]], $this->backoff);
         foreach ((array) ($answer->json()['accounts'] ?? []) as $account) {
-            if (($account['account_id'] ?? null) === $this->accountId) {
-                return $this->baseUri = rtrim((string) $account['base_uri'], '/').'/restapi';
+            $account = Data::of($account);
+            if ($account->get('account_id') === $this->accountId) {
+                return $this->baseUri = rtrim($account->text('base_uri'), '/').'/restapi';
             }
         }
 
@@ -143,12 +147,12 @@ final class Api
     /** @param array<string, mixed> $options */
     private function call(string $method, string $path, array $options): Answer
     {
-        $options['headers'] = ['Authorization' => 'Bearer '.$this->token()] + ($options['headers'] ?? []);
+        $options['headers'] = ['Authorization' => 'Bearer '.$this->token()] + Data::map($options['headers'] ?? []);
         $answer = Answer::send($this->http, self::PROVIDER, $method, $this->base().$path, $options, $this->backoff);
         if ($answer->status >= 400) {
             $error = json_decode($answer->body, true);
-            $message = \sprintf('%s %s: HTTP %d, %s', $method, $path, $answer->status, \is_array($error) ? trim(($error['errorCode'] ?? '').' '.($error['message'] ?? '')) : mb_substr(trim($answer->body), 0, 200));
-            throw \in_array($answer->status, [401, 403], true) ? new InvalidKeyException(self::PROVIDER, $message, (string) $answer->status) : new ProviderException(self::PROVIDER, $message, \is_array($error) ? ($error['errorCode'] ?? null) : (string) $answer->status);
+            $message = \sprintf('%s %s: HTTP %d, %s', $method, $path, $answer->status, \is_array($error) ? trim(Data::of($error)->text('errorCode').' '.Data::of($error)->text('message')) : mb_substr(trim($answer->body), 0, 200));
+            throw \in_array($answer->status, [401, 403], true) ? new InvalidKeyException(self::PROVIDER, $message, (string) $answer->status) : new ProviderException(self::PROVIDER, $message, \is_array($error) ? Data::of($error)->textOrNull('errorCode') : (string) $answer->status);
         }
 
         return $answer;

@@ -14,3 +14,6 @@
   older kernel (1568f2c, what the sites' vendors hold) `usagePolicy()` reads policy.json without
   the limit per envelope, which that kernel refuses, and the gateway runs as before; that kernel's
   `PolicyExport` reports the file as unreadable.
+- PHPStan at level max with an empty baseline (`phpstan.neon`, `phpstan-baseline.neon`, as the
+  family's harness and CI run it): types only, DocuSign's answers read through an internal `Data`
+  that gives the values the casts gave. No behaviour change.

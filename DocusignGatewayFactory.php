@@ -92,11 +92,11 @@ final class DocusignGatewayFactory extends GatewayFactory
 
                 return new Api(
                     $this->http ?? HttpClient::create(),
-                    (string) $c['integration_key'],
-                    (string) $c['user_id'],
-                    (string) $c['private_key'],
-                    (string) $c['account_id'],
-                    $c->get('base_uri') ? rtrim((string) $c['base_uri'], '/') : ($sandbox ? 'https://demo.docusign.net/restapi' : null),
+                    Data::cast($c['integration_key']),
+                    Data::cast($c['user_id']),
+                    Data::cast($c['private_key']),
+                    Data::cast($c['account_id']),
+                    $c->get('base_uri') ? rtrim(Data::cast($c['base_uri']), '/') : ($sandbox ? 'https://demo.docusign.net/restapi' : null),
                     $sandbox ? Api::DEMO_OAUTH : Api::OAUTH,
                     $c->list('hmac_keys'),
                     backoff: $c->backoff(),

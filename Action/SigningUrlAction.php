@@ -2,6 +2,7 @@
 
 namespace Omnisign\Docusign\Action;
 
+use Omnisign\Docusign\Data;
 use Omnisign\Exception\InvalidConfigException;
 use Omnisign\Model\SigningUrl;
 use Omnisign\Request\Request;
@@ -33,6 +34,6 @@ final class SigningUrlAction extends AbstractAction
             'userName' => $signer->name,
             'clientUserId' => $signer->key,
         ]);
-        $request->setResult(new SigningUrl((string) $view['url']));
+        $request->setResult(new SigningUrl(Data::of($view)->text('url')));
     }
 }
