@@ -23,6 +23,14 @@ no developer account.**
 [Documentation](docs/index.md): the options and the JWT grant, from an envelope to DocuSign's,
 Connect, what was verified.
 
+## Install
+
+```sh
+composer require omnisign/docusign
+```
+
+It brings the family's core, `omnisense/omnisign`, and `omnisense/contracts` with it. **A DocuSign account is needed** (a free developer account for the sandbox): an integration key, a user who granted consent, its RSA private key, the account id. The tests run on recorded answers.
+
 ## Usage policy
 
 `policy.json`, read on 2026-11-10 in DocuSign's [rules and limits](https://developers.docusign.com/docs/esign-rest-api/esign101/rules-and-limits/)
@@ -30,8 +38,7 @@ and [developer terms](https://www.docusign.com/legal/terms-and-conditions/develo
 a burst of 500 in 30 seconds (200 in the developer environment, declared when `sandbox` is true).
 One status poll per envelope every 15 minutes, counted per envelope (`"scope": "resource"`,
 `"per": "envelope"`): `fetch()` of an envelope polled less than 15 minutes ago is a
-`UsageLimitReachedException`, never sent (omnisense/contracts 2f78f0e or later; with an older one
-the limit is left out and nothing is counted per envelope). Prefer Connect webhooks. A 429 holds
+`UsageLimitReachedException`, never sent. Prefer Connect webhooks. A 429 holds
 the gateway's next calls.
 
 ## Responsibility

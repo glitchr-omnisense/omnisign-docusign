@@ -26,7 +26,7 @@ final class PolicyTest extends TestCase
 
     public function testThePolicyIsDeclaredAndRead(): void
     {
-        $declared = DocusignGatewayFactory::countsPerResource() ? UsagePolicy::fromFile(__DIR__.'/../policy.json') : DocusignGatewayFactory::usagePolicy();
+        $declared = UsagePolicy::fromFile(__DIR__.'/../policy.json');
         $composer = json_decode((string) file_get_contents(__DIR__.'/../composer.json'), true);
 
         self::assertIsArray($composer);
@@ -37,7 +37,7 @@ final class PolicyTest extends TestCase
         self::assertSame('2026-11-10', $declared->provenance->verifiedAt);
         self::assertSame($declared->toArray(), DocusignGatewayFactory::usagePolicy()->toArray());
         self::assertNotNull($declared->rateLimits);
-        self::assertSame([[3000, 'hour', 1], [500, 'second', 30], ...(DocusignGatewayFactory::countsPerResource() ? [[1, 'minute', 15]] : [])], array_map(static fn ($limit) => [$limit->max, $limit->window->value, $limit->every], $declared->rateLimits));
+        self::assertSame([[3000, 'hour', 1], [500, 'second', 30], [1, 'minute', 15]], array_map(static fn ($limit) => [$limit->max, $limit->window->value, $limit->every], $declared->rateLimits));
 
         $registry = new Registry([new DocusignGatewayFactory(new MockHttpClient())], ['docusign' => ['factory' => 'docusign', 'options' => self::options()]]);
         self::assertSame(DocusignGatewayFactory::sandboxPolicy()->toArray(), $registry->policy('docusign')->toArray());
@@ -70,9 +70,6 @@ final class PolicyTest extends TestCase
 
     public function testAnEnvelopeIsPolledOncePer15MinutesTheNextPollNeverSent(): void
     {
-        if (!DocusignGatewayFactory::countsPerResource()) {
-            self::markTestSkipped('omnisense/contracts before 2f78f0e counts no limit per resource.');
-        }
         $requests = 0;
         $http = new MockHttpClient(function (string $method, string $url) use (&$requests): MockResponse {
             if (str_contains($url, '/oauth/token')) {
