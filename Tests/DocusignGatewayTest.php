@@ -81,11 +81,11 @@ final class DocusignGatewayTest extends TestCase
         return new Envelope(
             'Bail - Maison Érable',
             [new Document('lease', new File('%PDF-1.7 lease', 'bail.pdf'))],
-            [new Signer('landlord', 'Marco Meyer', 'marco@meyers.example', order: 1), new Signer('tenant', 'Camille Érable', 'camille@erable.example', order: 2)],
+            [new Signer('landlord', 'Alex Martin', 'alex@sci-exemple.example', order: 1), new Signer('tenant', 'Camille Érable', 'camille@erable.example', order: 2)],
             [new Field('landlord', 'lease', page: 3, x: 77, y: 581), new Field('tenant', 'lease', FieldType::DATE, 3, 330, 620), new Field('tenant', 'lease', anchor: '/sign-tenant/')],
             ordered: true,
             embedded: true,
-            redirectUrl: 'https://meyers.example/leases/42/signed',
+            redirectUrl: 'https://sci-exemple.example/leases/42/signed',
         );
     }
 
@@ -118,7 +118,7 @@ final class DocusignGatewayTest extends TestCase
         self::assertSame(['documentBase64' => base64_encode('%PDF-1.7 lease'), 'name' => 'bail.pdf', 'fileExtension' => 'pdf', 'documentId' => '1'], $body->data('documents')->get(0));
         self::assertSame('created', $body->get('status'));
         [$landlord, $tenant] = $body->data('recipients')->list('signers');
-        self::assertSame(['marco@meyers.example', 'Marco Meyer', '1', '1', 'landlord'], [$landlord->get('email'), $landlord->get('name'), $landlord->get('recipientId'), $landlord->get('routingOrder'), $landlord->get('clientUserId')]);
+        self::assertSame(['alex@sci-exemple.example', 'Alex Martin', '1', '1', 'landlord'], [$landlord->get('email'), $landlord->get('name'), $landlord->get('recipientId'), $landlord->get('routingOrder'), $landlord->get('clientUserId')]);
         self::assertSame([['documentId' => '1', 'pageNumber' => '3', 'xPosition' => '77', 'yPosition' => '581']], $landlord->data('tabs')->get('signHereTabs'));
         self::assertSame([['documentId' => '1', 'pageNumber' => '3', 'xPosition' => '330', 'yPosition' => '620']], $tenant->data('tabs')->get('dateSignedTabs'));
         self::assertSame([['documentId' => '1', 'anchorString' => '/sign-tenant/', 'anchorUnits' => 'pixels', 'anchorXOffset' => '0', 'anchorYOffset' => '0']], $tenant->data('tabs')->get('signHereTabs'));
@@ -161,11 +161,11 @@ final class DocusignGatewayTest extends TestCase
         $sent = $gateway->send($gateway->create(self::lease()));
 
         self::assertSame('https://demo.docusign.net/Signing/MTRedeem/v1/4b5c6d7e?slt=eyJ0eXAi', $gateway->signingUrl($sent, 'tenant')->url);
-        self::assertSame(['returnUrl' => 'https://meyers.example/leases/42/signed', 'authenticationMethod' => 'none', 'email' => 'camille@erable.example', 'userName' => 'Camille Érable', 'clientUserId' => 'tenant'], json_decode(Data::cast($this->calls[4][2]['body'] ?? null), true));
+        self::assertSame(['returnUrl' => 'https://sci-exemple.example/leases/42/signed', 'authenticationMethod' => 'none', 'email' => 'camille@erable.example', 'userName' => 'Camille Érable', 'clientUserId' => 'tenant'], json_decode(Data::cast($this->calls[4][2]['body'] ?? null), true));
 
         $gateway->remind($sent);
         self::assertSame(['resend_envelope' => 'true'], $this->calls[5][2]['query']);
-        self::assertSame(['signers' => [['recipientId' => '1', 'email' => 'marco@meyers.example', 'name' => 'Marco Meyer'], ['recipientId' => '2', 'email' => 'camille@erable.example', 'name' => 'Camille Érable']]], json_decode(Data::cast($this->calls[5][2]['body'] ?? null), true));
+        self::assertSame(['signers' => [['recipientId' => '1', 'email' => 'alex@sci-exemple.example', 'name' => 'Alex Martin'], ['recipientId' => '2', 'email' => 'camille@erable.example', 'name' => 'Camille Érable']]], json_decode(Data::cast($this->calls[5][2]['body'] ?? null), true));
 
         $done = $gateway->fetch($sent);
         self::assertSame([Status::COMPLETED, SignerStatus::SIGNED, '2026-10-09T17:30:00+00:00'], [$done->status, $done->state('tenant')?->status, $done->state('tenant')?->signedAt?->format(\DATE_ATOM)]);
